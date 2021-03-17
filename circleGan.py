@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 from torch.optim import Adam
 from torch.utils.data import DataLoader, Dataset
+import torchvision.datasets as datasets
 from torchvision.transforms import ToTensor, Compose, CenterCrop, RandomCrop, RandomHorizontalFlip, RandomSizedCrop, \
     Normalize
 from torchvision.io import read_image
@@ -12,8 +13,9 @@ import numpy as np
 
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 # DEVICE = 'cpu'
-EPOCHS = 1
-BATCH_SIZE = 10
+EPOCHS = 100
+BATCH_SIZE = 100
+LEARN_RATE = 0.0002
 print(f'Using {DEVICE}')
 
 
@@ -46,11 +48,16 @@ class VanGoghDataset(Dataset):
         return sample
 
 
-trans = Compose([RandomSizedCrop(40), RandomHorizontalFlip(0.5)])
+# trans = Compose([RandomSizedCrop(40), RandomHorizontalFlip(0.5)])
+#
+# trd = VanGoghDataset('./images/Van_Gogh/',
+#                      transform=trans)
+# dl = DataLoader(trd, batch_size=BATCH_SIZE, shuffle=True)
 
-trd = VanGoghDataset('./images/Van_Gogh/',
-                     transform=trans)
-dl = DataLoader(trd, batch_size=BATCH_SIZE, shuffle=True)
+transform = Compose([ToTensor(),Normalize((0.5,), (0.5,))])
+train_set = datasets.MNIST('mnist/', train=True, download=True, transform=transform)
+dl = DataLoader(train_set, batch_size=BATCH_SIZE, shuffle=True)
+
 
 
 class Discriminator(nn.Module):
@@ -68,10 +75,16 @@ class Discriminator(nn.Module):
             # nn.Sigmoid()
 
             nn.Flatten(),
-            nn.Linear(3*40*40, 1000),
-            nn.Dropout(0.5),
+            nn.Linear(1*28*28, 1024),
+            nn.Dropout(0.3),
             nn.LeakyReLU(0.2),
-            nn.Linear(1000, 1),
+            nn.Linear(1024, 512),
+            nn.Dropout(0.3),
+            nn.LeakyReLU(0.2),
+            nn.Linear(512, 256),
+            nn.Dropout(0.3),
+            nn.LeakyReLU(0.2),
+            nn.Linear(256, 1),
             nn.Sigmoid()
         )
 
@@ -82,11 +95,22 @@ class Generator(nn.Module):
     def __init__(self):
         super(Generator, self).__init__()
         self.main = nn.Sequential(
-            nn.Linear(128, 512),
-            nn.ReLU(),
-            nn.Linear(512, 2048),
-            nn.ReLU(),
-            nn.Linear(2048, 40*40*3),
+            # nn.Linear(128, 256),
+            # nn.ReLU(0.2),
+            #
+            # nn.Linear(256, 512),
+            # nn.ReLU(0.2),
+            #
+            # nn.Linear(512, 784),
+            # nn.Tanh()
+
+            nn.Linear(128, 256),
+            nn.LeakyReLU(0.2),
+            nn.Linear(256, 512),
+            nn.LeakyReLU(0.2),
+            nn.Linear(512,1024),
+            nn.LeakyReLU(0.2),
+            nn.Linear(1024, 28*28*1),
             nn.Tanh()
         )
 
@@ -107,6 +131,20 @@ def showImg(img:torch.Tensor):
     plt.imshow(img)
     plt.show()
 
+def draw_images(generator,t, examples=25, dim=(5, 5), figsize=(10, 10)):
+    noise = (torch.rand(examples, 128).to(DEVICE) - 0.5) / 0.5
+    generated_images = generator(noise)
+    generated_images = generated_images.reshape(examples, 28, 28)
+    plt.figure(figsize=figsize)
+    generated_images = generated_images.cpu().detach().numpy()
+    for i in range(generated_images.shape[0]):
+        plt.subplot(dim[0], dim[1], i + 1)
+        plt.imshow(generated_images[i], interpolation='nearest', cmap='Greys')
+        plt.axis('off')
+        plt.tight_layout()
+    plt.savefig(f'Generated_images {t}.png')
+    plt.close()
+
 
 discriminator = Discriminator().to(DEVICE)
 generator = Generator().to(DEVICE)
@@ -114,8 +152,8 @@ generator = Generator().to(DEVICE)
 print(discriminator)
 print(generator)
 
-d_optimizer = Adam(discriminator.parameters(), lr=0.0001, betas=(0.5, 0.999))
-g_optimizer = Adam(generator.parameters(), lr=0.1, betas=(0.5, 0.999))
+d_optimizer = Adam(discriminator.parameters(), lr=LEARN_RATE)
+g_optimizer = Adam(generator.parameters(), lr=LEARN_RATE)
 
 
 def train(dl, discriminator, generator, d_optimizer, g_optimizer):
@@ -141,25 +179,26 @@ def train(dl, discriminator, generator, d_optimizer, g_optimizer):
         d_loss.backward()
         d_optimizer.step()
 
-        for _ in range(100):
-            # Generator
-            noise = torch.rand(batchSize, 128).to(DEVICE)
-            fakeInput = generator(noise)
-            fakeOutput = discriminator(fakeInput)
+        # Generator
+        noise = torch.rand(batchSize, 128).to(DEVICE)
+        fakeInput = generator(noise)
+        fakeOutput = discriminator(fakeInput)
 
-            # Generator Backpropagation
-            g_loss = g_loss_func(fakeOutput)
-            g_optimizer.zero_grad()
-            g_loss.backward()
-            g_optimizer.step()
+        # Generator Backpropagation
+        g_loss = g_loss_func(fakeOutput)
+        g_optimizer.zero_grad()
+        g_loss.backward()
+        g_optimizer.step()
 
         if batch % 100 == 0:
             current = batch * len(X)
             print(f"d_loss: {d_loss.item():>7f} g_loss: {g_loss.item():>7f} [{current:>5d}/{size:>5d}]")
 
+
 for t in range(EPOCHS):
     print(f"Epoch {t+1}\n-------------------------------")
     train(dl, discriminator, generator, d_optimizer, g_optimizer)
+    draw_images(generator, t)
 print("Done!")
 
 
