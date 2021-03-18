@@ -16,7 +16,7 @@ DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 EPOCHS = 10000
 BATCH_SIZE = 100
 LEARN_RATE = 0.0002
-IMAGE_DIR = './images/Van_Gogh2/'
+IMAGE_DIR = './images/Van_Gogh/'
 print(f'Using {DEVICE}')
 
 
@@ -55,74 +55,43 @@ trd = VanGoghDataset(IMAGE_DIR,
                      transform=trans)
 dl = DataLoader(trd, batch_size=BATCH_SIZE, shuffle=True)
 
-'''
-transform = Compose([ToTensor(),Normalize((0.5,), (0.5,))])
-train_set = datasets.MNIST('mnist/', train=True, download=True, transform=transform)
-dl = DataLoader(train_set, batch_size=BATCH_SIZE, shuffle=True)
 
-class Discriminator(nn.Module):
-    def __init__(self):
-        super(Discriminator, self).__init__()
-        self.main = nn.Sequential(
-            nn.Flatten(),
-            nn.Linear(784, 256),
-            nn.LeakyReLU(0.2),
-            nn.Linear(256, 256),
-            nn.LeakyReLU(0.2),
-            nn.Linear(256, 1),
-            nn.Sigmoid()
-        )
+# transform = Compose([ToTensor(),Normalize((0.5,), (0.5,))])
+# train_set = datasets.MNIST('MNIST/', train=True, download=False, transform=transform)
+# dl = DataLoader(train_set, batch_size=BATCH_SIZE, shuffle=True)
+#
+# class Discriminator(nn.Module):
+#     def __init__(self):
+#         super(Discriminator, self).__init__()
+#         self.main = nn.Sequential(
+#             nn.Flatten(),
+#             nn.Linear(784, 256),
+#             nn.LeakyReLU(0.2),
+#             nn.Linear(256, 256),
+#             nn.LeakyReLU(0.2),
+#             nn.Linear(256, 1),
+#             nn.Sigmoid()
+#         )
+#
+#     def forward(self, input):
+#         return self.main(input)
+#
+#
+# class Generator(nn.Module):
+#     def __init__(self):
+#         super(Generator, self).__init__()
+#         self.main = nn.Sequential(
+#             nn.Linear(128, 1024),
+#             nn.ReLU(),
+#             nn.Linear(1024, 1024),
+#             nn.ReLU(),
+#             nn.Linear(1024, 784),
+#             nn.Tanh()
+#         )
+#
+#     def forward(self, input):
+#         return self.main(input)
 
-    def forward(self, input):
-        return self.main(input)
-
-
-class Generator(nn.Module):
-    def __init__(self):
-        super(Generator, self).__init__()
-        self.main = nn.Sequential(
-            nn.Linear(128, 1024),
-            nn.ReLU(),
-            nn.Linear(1024, 1024),
-            nn.ReLU(),
-            nn.Linear(1024, 784),
-            nn.Tanh()
-        )
-
-    def forward(self, input):
-        return self.main(input)
-'''
-
-class Discriminator(nn.Module):
-    def __init__(self):
-        super(Discriminator, self).__init__()
-        self.main = nn.Sequential(
-            nn.Flatten(),
-            nn.Linear(3*40*40, 4096),
-            nn.LeakyReLU(0.2),
-            nn.Linear(4096, 2048),
-            nn.LeakyReLU(0.2),
-            nn.Linear(2048, 512),
-            nn.LeakyReLU(0.2),
-            nn.Linear(512, 1),
-            nn.Sigmoid()
-
-            # nn.Flatten(),
-            # nn.Linear(1*28*28, 1024),
-            # nn.Dropout(0.3),
-            # nn.LeakyReLU(0.2),
-            # nn.Linear(1024, 512),
-            # nn.Dropout(0.3),
-            # nn.LeakyReLU(0.2),
-            # nn.Linear(512, 256),
-            # nn.Dropout(0.3),
-            # nn.LeakyReLU(0.2),
-            # nn.Linear(256, 1),
-            # nn.Sigmoid()
-        )
-
-    def forward(self, x):
-        return self.main(x)
 
 class Reshape(nn.Module):
     def __init__(self, *args):
@@ -130,6 +99,32 @@ class Reshape(nn.Module):
         self.shape = args
     def forward(self, x):
         return x.view((x.size(0),)+self.shape)
+
+class Discriminator(nn.Module):
+    def __init__(self):
+        super(Discriminator, self).__init__()
+        self.main = nn.Sequential(
+            nn.Conv2d(in_channels=3, out_channels=10, kernel_size=5, stride=1,padding=4, bias=False),
+            nn.BatchNorm2d(10),
+            nn.LeakyReLU(0.2),
+            nn.MaxPool2d(2),
+            nn.Conv2d(in_channels=10, out_channels=20, kernel_size=5, stride=1, padding=4, bias=False),
+            nn.BatchNorm2d(20),
+            nn.LeakyReLU(0.2),
+            nn.MaxPool2d(2),
+            nn.Conv2d(in_channels=20, out_channels=40, kernel_size=3, stride=2, bias=False),
+            nn.BatchNorm2d(40),
+            nn.LeakyReLU(0.2),
+            nn.MaxPool2d(2),
+            Reshape(360),
+            nn.Linear(360, 128),
+            nn.LeakyReLU(0.2),
+            nn.Linear(128, 1),
+            nn.Sigmoid()
+        )
+
+    def forward(self, x):
+        return self.main(x)
 
 class Generator(nn.Module):
     def __init__(self):
