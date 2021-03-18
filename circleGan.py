@@ -13,9 +13,10 @@ import numpy as np
 
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 # DEVICE = 'cpu'
-EPOCHS = 100
+EPOCHS = 10000
 BATCH_SIZE = 100
 LEARN_RATE = 0.0002
+IMAGE_DIR = './images/Van_Gogh/'
 print(f'Using {DEVICE}')
 
 
@@ -34,7 +35,7 @@ class VanGoghDataset(Dataset):
         image = read_image(self.img_dir + img_path)
 
         image = image.float()
-        image = (image - 0.5) / 255
+        image = (image / 255 - 0.5) * 2
 
         label = torch.ones(1)
 
@@ -48,44 +49,74 @@ class VanGoghDataset(Dataset):
         return sample
 
 
-# trans = Compose([RandomSizedCrop(40), RandomHorizontalFlip(0.5)])
+trans = Compose([RandomSizedCrop(40), RandomHorizontalFlip(0.5)])
+
+trd = VanGoghDataset(IMAGE_DIR,
+                     transform=trans)
+dl = DataLoader(trd, batch_size=BATCH_SIZE, shuffle=True)
+
+# transform = Compose([ToTensor(),Normalize((0.5,), (0.5,))])
+# train_set = datasets.MNIST('mnist/', train=True, download=True, transform=transform)
+# dl = DataLoader(train_set, batch_size=BATCH_SIZE, shuffle=True)
+
+# class Discriminator(nn.Module):
+#     def __init__(self):
+#         super(Discriminator, self).__init__()
+#         self.main = nn.Sequential(
+#             nn.Flatten(),
+#             nn.Linear(784, 256),
+#             nn.LeakyReLU(0.2),
+#             nn.Linear(256, 256),
+#             nn.LeakyReLU(0.2),
+#             nn.Linear(256, 1),
+#             nn.Sigmoid()
+#         )
 #
-# trd = VanGoghDataset('./images/Van_Gogh/',
-#                      transform=trans)
-# dl = DataLoader(trd, batch_size=BATCH_SIZE, shuffle=True)
-
-transform = Compose([ToTensor(),Normalize((0.5,), (0.5,))])
-train_set = datasets.MNIST('mnist/', train=True, download=True, transform=transform)
-dl = DataLoader(train_set, batch_size=BATCH_SIZE, shuffle=True)
-
-
+#     def forward(self, input):
+#         return self.main(input)
+#
+#
+# class Generator(nn.Module):
+#     def __init__(self):
+#         super(Generator, self).__init__()
+#         self.main = nn.Sequential(
+#             nn.Linear(128, 1024),
+#             nn.ReLU(),
+#             nn.Linear(1024, 1024),
+#             nn.ReLU(),
+#             nn.Linear(1024, 784),
+#             nn.Tanh()
+#         )
+#
+#     def forward(self, input):
+#         return self.main(input)
 
 class Discriminator(nn.Module):
     def __init__(self):
         super(Discriminator, self).__init__()
         self.main = nn.Sequential(
-            # nn.Flatten(),
-            # nn.Linear(3*80*80, 5000),
-            # nn.LeakyReLU(0.2),
-            # nn.Linear(5000, 1000),
-            # nn.LeakyReLU(0.2),
-            # nn.Linear(1000, 100),
-            # nn.LeakyReLU(0.2),
-            # nn.Linear(100, 1),
-            # nn.Sigmoid()
-
             nn.Flatten(),
-            nn.Linear(1*28*28, 1024),
-            nn.Dropout(0.3),
+            nn.Linear(3*40*40, 4096),
             nn.LeakyReLU(0.2),
-            nn.Linear(1024, 512),
-            nn.Dropout(0.3),
+            nn.Linear(4096, 2048),
             nn.LeakyReLU(0.2),
-            nn.Linear(512, 256),
-            nn.Dropout(0.3),
+            nn.Linear(2048, 512),
             nn.LeakyReLU(0.2),
-            nn.Linear(256, 1),
+            nn.Linear(512, 1),
             nn.Sigmoid()
+
+            # nn.Flatten(),
+            # nn.Linear(1*28*28, 1024),
+            # nn.Dropout(0.3),
+            # nn.LeakyReLU(0.2),
+            # nn.Linear(1024, 512),
+            # nn.Dropout(0.3),
+            # nn.LeakyReLU(0.2),
+            # nn.Linear(512, 256),
+            # nn.Dropout(0.3),
+            # nn.LeakyReLU(0.2),
+            # nn.Linear(256, 1),
+            # nn.Sigmoid()
         )
 
     def forward(self, x):
@@ -95,22 +126,13 @@ class Generator(nn.Module):
     def __init__(self):
         super(Generator, self).__init__()
         self.main = nn.Sequential(
-            # nn.Linear(128, 256),
-            # nn.ReLU(0.2),
-            #
-            # nn.Linear(256, 512),
-            # nn.ReLU(0.2),
-            #
-            # nn.Linear(512, 784),
-            # nn.Tanh()
-
-            nn.Linear(128, 256),
+            nn.Linear(128, 1024),
             nn.LeakyReLU(0.2),
-            nn.Linear(256, 512),
+            nn.Linear(1024, 2048),
             nn.LeakyReLU(0.2),
-            nn.Linear(512,1024),
+            nn.Linear(2048, 4096),
             nn.LeakyReLU(0.2),
-            nn.Linear(1024, 28*28*1),
+            nn.Linear(4096, 3*40*40),
             nn.Tanh()
         )
 
@@ -126,7 +148,7 @@ def g_loss_func(inputs):
 
 def showImg(img:torch.Tensor):
     img = np.rollaxis(img.numpy(), 0, 3)
-    img = (img + 0.5) * 255
+    img = (img / 2 + 0.5) * 255
     img = img.astype(np.uint8)
     plt.imshow(img)
     plt.show()
@@ -134,15 +156,18 @@ def showImg(img:torch.Tensor):
 def draw_images(generator,t, examples=25, dim=(5, 5), figsize=(10, 10)):
     noise = (torch.rand(examples, 128).to(DEVICE) - 0.5) / 0.5
     generated_images = generator(noise)
-    generated_images = generated_images.reshape(examples, 28, 28)
+    generated_images = generated_images.reshape(examples, 3,40, 40)
     plt.figure(figsize=figsize)
     generated_images = generated_images.cpu().detach().numpy()
+    generated_images = (generated_images / 2 + 0.5) * 255
+    generated_images = np.rollaxis(generated_images, 1, 4)
+    generated_images = generated_images.astype(dtype=np.uint8)
     for i in range(generated_images.shape[0]):
         plt.subplot(dim[0], dim[1], i + 1)
         plt.imshow(generated_images[i], interpolation='nearest', cmap='Greys')
         plt.axis('off')
         plt.tight_layout()
-    plt.savefig(f'Generated_images {t}.png')
+    plt.savefig(f'./target/Generated_images {t}.png')
     plt.close()
 
 
@@ -152,8 +177,8 @@ generator = Generator().to(DEVICE)
 print(discriminator)
 print(generator)
 
-d_optimizer = Adam(discriminator.parameters(), lr=LEARN_RATE)
-g_optimizer = Adam(generator.parameters(), lr=LEARN_RATE)
+d_optimizer = Adam(discriminator.parameters(), lr=LEARN_RATE, betas=(0.5, 0.999))
+g_optimizer = Adam(generator.parameters(), lr=LEARN_RATE, betas=(0.5, 0.999))
 
 
 def train(dl, discriminator, generator, d_optimizer, g_optimizer):
@@ -165,7 +190,7 @@ def train(dl, discriminator, generator, d_optimizer, g_optimizer):
         realOutput = discriminator(realInput)
         realLabel = torch.ones(batchSize, 1).to(DEVICE)
 
-        noise = torch.rand(batchSize, 128).to(DEVICE)
+        noise = (torch.rand(batchSize, 128).to(DEVICE) - 0.5) / 0.5
         fakeInput = generator(noise)
         fakeOutput = discriminator(fakeInput)
         fakeLabel = torch.zeros(batchSize, 1).to(DEVICE)
@@ -180,7 +205,7 @@ def train(dl, discriminator, generator, d_optimizer, g_optimizer):
         d_optimizer.step()
 
         # Generator
-        noise = torch.rand(batchSize, 128).to(DEVICE)
+        noise = (torch.rand(batchSize, 128).to(DEVICE) - 0.5) / 0.5
         fakeInput = generator(noise)
         fakeOutput = discriminator(fakeInput)
 
@@ -190,15 +215,17 @@ def train(dl, discriminator, generator, d_optimizer, g_optimizer):
         g_loss.backward()
         g_optimizer.step()
 
-        if batch % 100 == 0:
+        if batch == 0:
             current = batch * len(X)
+            print(fakeOutput.detach().to("cpu").reshape(-1))
             print(f"d_loss: {d_loss.item():>7f} g_loss: {g_loss.item():>7f} [{current:>5d}/{size:>5d}]")
 
 
 for t in range(EPOCHS):
     print(f"Epoch {t+1}\n-------------------------------")
     train(dl, discriminator, generator, d_optimizer, g_optimizer)
-    draw_images(generator, t)
+    if t % 10 == 0:
+        draw_images(generator, t)
 print("Done!")
 
 
