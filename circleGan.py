@@ -14,9 +14,9 @@ import numpy as np
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 # DEVICE = 'cpu'
 EPOCHS = 10000
-BATCH_SIZE = 100
+BATCH_SIZE = 32
 LEARN_RATE = 0.0002
-IMAGE_DIR = './images/Van_Gogh/'
+IMAGE_DIR = './images/Van_Gogh2/'
 print(f'Using {DEVICE}')
 
 
@@ -59,39 +59,6 @@ dl = DataLoader(trd, batch_size=BATCH_SIZE, shuffle=True)
 # transform = Compose([ToTensor(),Normalize((0.5,), (0.5,))])
 # train_set = datasets.MNIST('MNIST/', train=True, download=False, transform=transform)
 # dl = DataLoader(train_set, batch_size=BATCH_SIZE, shuffle=True)
-#
-# class Discriminator(nn.Module):
-#     def __init__(self):
-#         super(Discriminator, self).__init__()
-#         self.main = nn.Sequential(
-#             nn.Flatten(),
-#             nn.Linear(784, 256),
-#             nn.LeakyReLU(0.2),
-#             nn.Linear(256, 256),
-#             nn.LeakyReLU(0.2),
-#             nn.Linear(256, 1),
-#             nn.Sigmoid()
-#         )
-#
-#     def forward(self, input):
-#         return self.main(input)
-#
-#
-# class Generator(nn.Module):
-#     def __init__(self):
-#         super(Generator, self).__init__()
-#         self.main = nn.Sequential(
-#             nn.Linear(128, 1024),
-#             nn.ReLU(),
-#             nn.Linear(1024, 1024),
-#             nn.ReLU(),
-#             nn.Linear(1024, 784),
-#             nn.Tanh()
-#         )
-#
-#     def forward(self, input):
-#         return self.main(input)
-
 
 class Reshape(nn.Module):
     def __init__(self, *args):
@@ -99,6 +66,40 @@ class Reshape(nn.Module):
         self.shape = args
     def forward(self, x):
         return x.view((x.size(0),)+self.shape)
+
+'''
+class Discriminator(nn.Module):
+    def __init__(self):
+        super(Discriminator, self).__init__()
+        self.main = nn.Sequential(
+            nn.Flatten(),
+            nn.Linear(784, 256),
+            nn.LeakyReLU(0.2),
+            nn.Linear(256, 256),
+            nn.LeakyReLU(0.2),
+            nn.Linear(256, 1),
+            nn.Sigmoid()
+        )
+
+    def forward(self, input):
+        return self.main(input)
+
+
+class Generator(nn.Module):
+    def __init__(self):
+        super(Generator, self).__init__()
+        self.main = nn.Sequential(
+            nn.Linear(128, 1024),
+            nn.ReLU(),
+            nn.Linear(1024, 1024),
+            nn.ReLU(),
+            nn.Linear(1024, 784),
+            nn.Tanh()
+        )
+
+    def forward(self, input):
+        return self.main(input)
+'''
 
 class Discriminator(nn.Module):
     def __init__(self):
@@ -164,7 +165,7 @@ def showImg(img:torch.Tensor):
 def draw_images(generator,t, examples=25, dim=(5, 5), figsize=(10, 10)):
     noise = (torch.rand(examples, 128).to(DEVICE) - 0.5) / 0.5
     generated_images = generator(noise)
-    generated_images = generated_images.reshape(examples, 3,40, 40)
+    generated_images = generated_images.reshape(examples, 3, 40, 40)
     generated_images = (generated_images / 2 + 0.5) * 255
     plt.figure(figsize=figsize)
     generated_images = generated_images.cpu().detach().numpy()
@@ -226,7 +227,7 @@ def train(dl, discriminator, generator, d_optimizer, g_optimizer):
 
         if batch == 0:
             current = batch * len(X)
-            print(fakeOutput.detach().to("cpu").reshape(-1))
+            # print(fakeOutput.detach().to("cpu").reshape(-1))
             print(f"d_loss: {d_loss.item():>7f} g_loss: {g_loss.item():>7f} [{current:>5d}/{size:>5d}]")
 
 
