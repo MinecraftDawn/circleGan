@@ -16,7 +16,7 @@ DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 EPOCHS = 10000
 BATCH_SIZE = 100
 LEARN_RATE = 0.0002
-IMAGE_DIR = './images/Van_Gogh/'
+IMAGE_DIR = './images/Van_Gogh2/'
 print(f'Using {DEVICE}')
 
 
@@ -55,41 +55,43 @@ trd = VanGoghDataset(IMAGE_DIR,
                      transform=trans)
 dl = DataLoader(trd, batch_size=BATCH_SIZE, shuffle=True)
 
-# transform = Compose([ToTensor(),Normalize((0.5,), (0.5,))])
-# train_set = datasets.MNIST('mnist/', train=True, download=True, transform=transform)
-# dl = DataLoader(train_set, batch_size=BATCH_SIZE, shuffle=True)
+'''
+transform = Compose([ToTensor(),Normalize((0.5,), (0.5,))])
+train_set = datasets.MNIST('mnist/', train=True, download=True, transform=transform)
+dl = DataLoader(train_set, batch_size=BATCH_SIZE, shuffle=True)
 
-# class Discriminator(nn.Module):
-#     def __init__(self):
-#         super(Discriminator, self).__init__()
-#         self.main = nn.Sequential(
-#             nn.Flatten(),
-#             nn.Linear(784, 256),
-#             nn.LeakyReLU(0.2),
-#             nn.Linear(256, 256),
-#             nn.LeakyReLU(0.2),
-#             nn.Linear(256, 1),
-#             nn.Sigmoid()
-#         )
-#
-#     def forward(self, input):
-#         return self.main(input)
-#
-#
-# class Generator(nn.Module):
-#     def __init__(self):
-#         super(Generator, self).__init__()
-#         self.main = nn.Sequential(
-#             nn.Linear(128, 1024),
-#             nn.ReLU(),
-#             nn.Linear(1024, 1024),
-#             nn.ReLU(),
-#             nn.Linear(1024, 784),
-#             nn.Tanh()
-#         )
-#
-#     def forward(self, input):
-#         return self.main(input)
+class Discriminator(nn.Module):
+    def __init__(self):
+        super(Discriminator, self).__init__()
+        self.main = nn.Sequential(
+            nn.Flatten(),
+            nn.Linear(784, 256),
+            nn.LeakyReLU(0.2),
+            nn.Linear(256, 256),
+            nn.LeakyReLU(0.2),
+            nn.Linear(256, 1),
+            nn.Sigmoid()
+        )
+
+    def forward(self, input):
+        return self.main(input)
+
+
+class Generator(nn.Module):
+    def __init__(self):
+        super(Generator, self).__init__()
+        self.main = nn.Sequential(
+            nn.Linear(128, 1024),
+            nn.ReLU(),
+            nn.Linear(1024, 1024),
+            nn.ReLU(),
+            nn.Linear(1024, 784),
+            nn.Tanh()
+        )
+
+    def forward(self, input):
+        return self.main(input)
+'''
 
 class Discriminator(nn.Module):
     def __init__(self):
@@ -122,17 +124,28 @@ class Discriminator(nn.Module):
     def forward(self, x):
         return self.main(x)
 
+class Reshape(nn.Module):
+    def __init__(self, *args):
+        super(Reshape, self).__init__()
+        self.shape = args
+    def forward(self, x):
+        return x.view((x.size(0),)+self.shape)
+
 class Generator(nn.Module):
     def __init__(self):
         super(Generator, self).__init__()
         self.main = nn.Sequential(
-            nn.Linear(128, 1024),
+            Reshape(128,1,1),
+            nn.ConvTranspose2d(in_channels=128, out_channels=64, kernel_size=4, stride=1, padding=0, bias=False),
+            nn.BatchNorm2d(num_features=64),
             nn.LeakyReLU(0.2),
-            nn.Linear(1024, 2048),
+            nn.ConvTranspose2d(in_channels=64, out_channels=32, kernel_size=4, stride=2, padding=0, bias=False),
+            nn.BatchNorm2d(num_features=32),
             nn.LeakyReLU(0.2),
-            nn.Linear(2048, 4096),
+            nn.ConvTranspose2d(in_channels=32, out_channels=16, kernel_size=4, stride=2, padding=1, bias=False),
+            nn.BatchNorm2d(num_features=16),
             nn.LeakyReLU(0.2),
-            nn.Linear(4096, 3*40*40),
+            nn.ConvTranspose2d(in_channels=16, out_channels=3, kernel_size=4, stride=2, padding=1, bias=False),
             nn.Tanh()
         )
 
@@ -157,9 +170,10 @@ def draw_images(generator,t, examples=25, dim=(5, 5), figsize=(10, 10)):
     noise = (torch.rand(examples, 128).to(DEVICE) - 0.5) / 0.5
     generated_images = generator(noise)
     generated_images = generated_images.reshape(examples, 3,40, 40)
+    generated_images = (generated_images / 2 + 0.5) * 255
     plt.figure(figsize=figsize)
     generated_images = generated_images.cpu().detach().numpy()
-    generated_images = (generated_images / 2 + 0.5) * 255
+
     generated_images = np.rollaxis(generated_images, 1, 4)
     generated_images = generated_images.astype(dtype=np.uint8)
     for i in range(generated_images.shape[0]):
